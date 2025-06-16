@@ -1,0 +1,4 @@
+numpy
+torch>=1.0.0
+PyWavelets>=1.0.0
+python>=3.12

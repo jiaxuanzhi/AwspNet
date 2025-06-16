@@ -325,8 +325,8 @@ class EncoderNetwork(nn.Module):
     def _init_encoder_backbone(self):
         """Initializes the backbone model as an encoder, removing the final classification layer."""
         if self.model_type == 'convnext_v2':
-            weights = models.ConvNeXt_V2_Small_Weights.IMAGENET1K_V1 if self.pretrained else None
-            model_temp = models.convnext_v2_small(weights=weights)
+            weights = models.ConvNeXt_Small_Weights.IMAGENET1K_V1 if self.pretrained else None
+            model_temp = models.convnext_small(weights=weights)
             self.encoder_feature_dim = model_temp.classifier[-1].in_features
             model_temp.classifier[-1] = nn.Identity()
             self.backbone = model_temp
@@ -419,7 +419,7 @@ class EncoderNetwork(nn.Module):
                 raise ValueError("Scattering layer (scat2a) output has 0 channels.")
             
             # Determine reduction factor for CBAM
-            reduction = current_channels_Z // 2 if current_channels_Z > 16 else 8 # Example logic for reduction
+            reduction = current_channels_Z // 16 if current_channels_Z > 64 else 8 # Example logic for reduction
             reduction = max(1, int(reduction)) 
             
             self.attention_module = CBAMBlock(channel=current_channels_Z, reduction=reduction, kernel_size=7).to(self.device)
@@ -1034,7 +1034,7 @@ if __name__ == "__main__":
     print("Loading main training data (for SupCon and prototype computation)...")
     train_dataset_full, num_classes = Train_data_Gen_with_labels( # Using updated function name
         data_path="./Data/Train_Data.mat", # Path to your primary training data
-        label_path="./Data/Train_Label.mat"
+        label_path="./Data/Train_Label_identify.mat"
     )
     print(f"Full training dataset size: {len(train_dataset_full)}, Num classes from training data: {num_classes}")
 
@@ -1044,7 +1044,7 @@ if __name__ == "__main__":
     # This ds1 will be used as the query set for the prototypical network.
     query_dataset_pool, _, num_classes_query = load_data_and_labels(
         data_path="./Data/Test_Data.mat",   # Path to your test/query data
-        label_path="./Data/Test_Label.mat",
+        label_path="./Data/Test_Label_identify.mat",
         test_split=0.0 
     )
     if num_classes_query > 0 and num_classes != num_classes_query: # num_classes_query could be 0 if pool empty
@@ -1059,7 +1059,7 @@ if __name__ == "__main__":
     print(f"Prototypical Network test (query) set size: {len(test_dataset_proto)}")
     
     # --- DataLoaders ---
-    supcon_batch_size = min(128, len(train_dataset_full)) if len(train_dataset_full) > 0 else 1 # Adjusted to not be 0
+    supcon_batch_size = min(64, len(train_dataset_full)) if len(train_dataset_full) > 0 else 1 # Adjusted to not be 0
     proto_eval_batch_size = min(64, len(test_dataset_proto)) if len(test_dataset_proto) > 0 else 1
 
     if len(train_dataset_full) == 0: 
@@ -1099,12 +1099,12 @@ if __name__ == "__main__":
 
     **ShuffleNet (2018)**: Combines pointwise group convolution and channel shuffle, significantly reducing computational load while preserving accuracy.
     '''
-    model_type = 'resnet50'  # Example: 'resnet50', 'convnext_v2', 'mobilenet_v3', 'efficientnet_v2',  'shufflenet', 'densenet'
+    model_type = 'efficientnet_v2'  # Example: 'resnet50', 'convnext_v2', 'mobilenet_v3', 'efficientnet_v2',  'shufflenet', 'densenet'
     use_pretrained_encoder_weights = True # For initial backbone weights before SupCon
     encoder_img_size = (224,224) # Adjust based on your data preprocessing for the encoder. Was (224,224), then (64,64)
 
     # Supervised Contrastive Learning Phase
-    supcon_epochs = 200 # E.g., 20-100 epochs, depends on dataset
+    supcon_epochs = 50 # E.g., 20-100 epochs, depends on dataset
     supcon_lr = 5e-4 # Tunable: 1e-3, 5e-4, 1e-4
     # projection_hidden_dim will be set after encoder init based on encoder.encoder_feature_dim
     projection_output_dim = 256 # Common for contrastive embeddings  256
